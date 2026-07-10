@@ -53,7 +53,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             # 日期-SHA 格式：20260710-abc1234
-            type=date,pattern={{date 'YYYYMMDD'}},suffix=-{{sha}}
+            type=raw,value={{date 'YYYYMMDD'}}-{{sha}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
