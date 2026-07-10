@@ -31,6 +31,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -47,8 +52,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # 使用 Git SHA 作为标签
-            type=sha,prefix=
+            # 日期-SHA 格式：20260710-abc1234
+            type=date,pattern={{date 'YYYYMMDD'}},suffix=-{{sha}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
@@ -56,6 +61,7 @@ jobs:
           context: .
           file: ./BaseDockerFile
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
