@@ -1,0 +1,74 @@
+# ============================================================
+# 基础镜像 Dockerfile - Runtime 环境（系统依赖 + PHP 扩展）
+# ============================================================
+# 用于构建基础镜像，包含：
+# - 系统依赖（nginx, supervisor, 工具等）
+# - PHP 扩展（pdo_mysql, gd, intl等）
+# - AWS CLI
+#
+# 不包含：
+# - Node.js（由主 Dockerfile 控制）
+# - OPcache 配置（由主 Dockerfile 控制，方便自定义）
+# - Laravel 源码
+# - 前端构建产物
+# - 业务相关的配置文件
+# - 启动脚本
+# ============================================================
+
+FROM php:8.1-fpm AS runtime
+
+# 控制是否使用国内 apt 镜像源（网络问题时设为 true）
+ARG USE_CN_MIRROR=false
+
+# 安装运行时依赖
+RUN set -eux; \
+    # 根据参数决定是否切换国内镜像源
+    if [ "${USE_CN_MIRROR}" = "true" ]; then \
+        apt-get update || true; \
+        find /etc/apt -name "*.list" -o -name "*.sources" 2>/dev/null | while read f; do \
+            sed -i 's/deb.debian.org/mirrors.aliyun.com/g' "$f" 2>/dev/null || true; \
+        done; \
+    fi; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+    nginx \
+    supervisor \
+    e2fsprogs \
+    vim \
+    wget \
+    net-tools \
+    telnet \
+    iputils-ping \
+    python3 \
+    python3-pip; \
+    # 安装 AWS CLI（使用 pip 安装，比官方镜像复制小 ~220 MB）
+    pip3 install --no-cache-dir --break-system-packages awscli; \
+    rm -rf /var/lib/apt/lists/* /root/.cache; \
+    # 创建日志目录和文件
+    mkdir -p /var/log/php-fpm /var/log/nginx && \
+    touch /var/log/nginx/json_access.log && \
+    chown -R www-data:www-data /var/log/nginx && \
+    chown www-data:www-data /var/log/php-fpm
+
+# 安装 PHP 扩展（自动处理所有依赖库）
+COPY --from=mlocati/php-extension-installer:latest /usr/bin/install-php-extensions /usr/local/bin/
+RUN install-php-extensions \
+    pdo_mysql \
+    gd \
+    pcntl \
+    zip \
+    bz2 \
+    bcmath \
+    mysqli \
+    intl \
+    opcache \
+    @composer \
+    imagick \
+    exif \
+    sockets
+
+# 设置工作目录
+WORKDIR /app
+
+# 暴露端口
+EXPOSE 80
